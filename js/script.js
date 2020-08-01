@@ -7,7 +7,7 @@ var dynamicSelection = (function () {
         featureInfo: {
             name: "APEX Dynamic Selection",
             info: {
-                scriptVersion: "1.0",
+                scriptVersion: "1.0.1",
                 utilVersion: "1.3.5",
                 url: "https://github.com/RonnyWeiss",
                 license: "MIT"
@@ -182,6 +182,13 @@ var dynamicSelection = (function () {
             remove: function () {
                 $("#dynToolTip").remove();
             }
+        },
+        getStrByteLength: function (pStr) {
+            if (pStr) {
+                var tmp = encodeURIComponent(pStr).match(/%[89ABab]/g);
+                return pStr.length + (tmp ? tmp.length : 0);
+            }
+            return 0;
         }
     };
 
@@ -251,6 +258,8 @@ var dynamicSelection = (function () {
      **
      ***********************************************************************/
     function renderPossibleItems(pEl, pObj, pConf) {
+        var arr = getItemValueAsArray(pConf);
+
         $.each(pObj, function (i, el) {
             var cEl = $(el);
 
@@ -259,7 +268,6 @@ var dynamicSelection = (function () {
             var i = $("<i></i>");
             i.addClass("fa");
 
-            var arr = getItemValueAsArray(pConf);
             if (arr.indexOf(str) > -1) {
                 i.addClass(pConf.selectedIcon);
             } else {
@@ -272,10 +280,7 @@ var dynamicSelection = (function () {
             cEl.css("cursor", "pointer");
             cEl.html(i);
             cEl.on("click", function () {
-                var aor = i.hasClass(pConf.unselectedIcon);
-                handleSelectedData(pConf, str, aor);
-                i.toggleClass(pConf.unselectedIcon);
-                i.toggleClass(pConf.selectedIcon);
+                handleSelectedData(pConf, str, i, pEl);
             });
             cEl.contextmenu(function (event) {
                 var objArr = [];
@@ -285,13 +290,24 @@ var dynamicSelection = (function () {
                     text: pConf.selectAllText,
                     action: function () {
                         var iEl = $(pEl).find(".dynamic-selection-element-icon");
-                        iEl.removeClass(pConf.unselectedIcon);
-                        iEl.addClass(pConf.selectedIcon);
-                        var setAllArr = [];
+                        var saStr = "";
+                        var tStr = "";
+                        var sep = "";
                         $.each($(pEl).find(".dynamic-selection-element"), function (i, saEl) {
-                            setAllArr.push($(saEl).attr("key-str"));
+                            var val = $(saEl).attr("key-str");
+                            if (pConf.noCLOB) {
+                                tStr += sep + val;
+                                var l = util.getStrByteLength(tStr);
+                                if (l > pConf.maxLength) {
+                                    return false;
+                                }
+                            }
+                            saStr += sep + val;
+                            sep = pConf.splitStr;
+                            $(saEl).children(".dynamic-selection-element-icon").addClass(pConf.selectedIcon);
+                            $(saEl).children(".dynamic-selection-element-icon").removeClass(pConf.unselectedIcon);
                         });
-                        var saStr = setAllArr.join(pConf.splitStr);
+
                         util.setItemValue(pConf.itemName, saStr);
                     }
                 });
@@ -324,17 +340,31 @@ var dynamicSelection = (function () {
      ** Used to handle selected data
      **
      ***********************************************************************/
-    function handleSelectedData(pConf, pValue, pAOR) {
+    function handleSelectedData(pConf, pValue, pEl, pParent) {
+        var i = $(pEl);
+        var str = "";
+        var aor = i.hasClass(pConf.unselectedIcon);
         var arr = getItemValueAsArray(pConf);
 
-        if (pAOR) {
+        if (aor) {
             arr.push(pValue);
+            str = arr.join(pConf.splitStr);
+            if (pConf.noCLOB) {
+                var l = util.getStrByteLength(str);
+                if (l > pConf.maxLength) {
+                    return;
+                }
+            }
+            util.setItemValue(pConf.itemName, str);
+            i.removeClass(pConf.unselectedIcon);
+            i.addClass(pConf.selectedIcon);
         } else {
             util.removeElementFromArray(arr, pValue);
+            i.removeClass(pConf.selectedIcon);
+            i.addClass(pConf.unselectedIcon);
+            str = arr.join(pConf.splitStr);
+            util.setItemValue(pConf.itemName, str);
         }
-
-        var str = arr.join(pConf.splitStr);
-        util.setItemValue(pConf.itemName, str);
     }
 
     /***********************************************************************
@@ -369,7 +399,7 @@ var dynamicSelection = (function () {
     }
 
     return {
-        initialize: function (pThis, pUseType, pUsedRegex, pItemName, pSplitStr, pUnselectedIcon, pSelecedIcon, pUnselectAllText, pSelectAllText) {
+        initialize: function (pThis, pUseType, pUsedRegex, pItemName, pSplitStr, pUnselectedIcon, pSelecedIcon, pUnselectAllText, pSelectAllText, pNoCLOB) {
 
             util.debug.info({
                 "pThis": pThis,
@@ -380,7 +410,8 @@ var dynamicSelection = (function () {
                 "pUnselectIcon": pUnselectedIcon,
                 "pSelectIcon": pSelecedIcon,
                 "pUnselectAllText": pUnselectAllText,
-                "pSelectAllText": pSelectAllText
+                "pSelectAllText": pSelectAllText,
+                "pNoCLOB": pNoCLOB
             });
 
             var conf = {};
@@ -393,6 +424,12 @@ var dynamicSelection = (function () {
             conf.selectedIcon = pSelecedIcon;
             conf.unselectAllText = pUnselectAllText;
             conf.selectAllText = pSelectAllText;
+            conf.maxLength = 4000;
+            conf.noCLOB = true;
+
+            if (pNoCLOB === "N") {
+                conf.noCLOB = false;
+            }
 
             $.each(pThis.affectedElements, function (i, pEl) {
                 findePossibleItems(pEl, conf);

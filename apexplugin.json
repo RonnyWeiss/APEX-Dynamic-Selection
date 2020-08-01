@@ -1,6 +1,6 @@
 {
     "name": "APEX Dynamic Selection",
-    "version": "1.0",
+    "version": "1.0.1",
     "description": "This plug-in is used to create a dynamic selection list to every report and region in APEX.",
     "keywords": ["oracle", "apex", "plugin", "dynamic action"],
     "homepage": "https://github.com/RonnyWeiss/APEX-Dynamic-Selection",
